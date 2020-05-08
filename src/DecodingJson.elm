@@ -12,16 +12,13 @@ import Json.Decode as Decode
         , list
         , string
         )
-import Json.Decode.Pipeline exposing (optional, required)
+import Json.Decode.Pipeline exposing (required)
+import RemoteData exposing (RemoteData, WebData)
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { posts = []
-      , errorMessage = Nothing
-      }
-    , Cmd.none
-    )
+    ( { posts = RemoteData.NotAsked }, Cmd.none )
 
 
 main : Program () Model Msg
@@ -40,7 +37,7 @@ main =
 
 type Msg
     = SendHttpRequest
-    | DataReceived (Result Http.Error (List Post))
+    | DataReceived (WebData (List Post))
 
 
 type alias Post =
@@ -52,9 +49,7 @@ type alias Post =
 
 
 type alias Model =
-    { posts : List Post
-    , errorMessage : Maybe String
-    }
+    { posts : WebData (List Post) }
 
 
 
@@ -72,12 +67,18 @@ view model =
 
 viewPostsOrError : Model -> Html Msg
 viewPostsOrError model =
-    case model.errorMessage of
-        Just message ->
-            viewError message
+    case model.posts of
+        RemoteData.NotAsked ->
+            text ""
 
-        Nothing ->
-            viewPosts model.posts
+        RemoteData.Loading ->
+            h3 [] [ text "Loading..." ]
+
+        RemoteData.Success posts ->
+            viewPosts posts
+
+        RemoteData.Failure httpError ->
+            viewError (buildErrorMessage httpError)
 
 
 viewError : String -> Html Msg
@@ -142,7 +143,9 @@ httpCommand : Cmd Msg
 httpCommand =
     Http.get
         { url = "http://localhost:5018/posts"
-        , expect = Http.expectJson DataReceived (list postDecoder)
+        , expect =
+            list postDecoder
+                |> Http.expectJson (RemoteData.fromResult >> DataReceived)
         }
 
 
@@ -154,22 +157,10 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SendHttpRequest ->
-            ( model, httpCommand )
+            ( { model | posts = RemoteData.Loading }, httpCommand )
 
-        DataReceived (Ok posts) ->
-            ( { model
-                | posts = posts
-                , errorMessage = Nothing
-              }
-            , Cmd.none
-            )
-
-        DataReceived (Err httpError) ->
-            ( { model
-                | errorMessage = Just (buildErrorMessage httpError)
-              }
-            , Cmd.none
-            )
+        DataReceived response ->
+            ( { model | posts = response }, Cmd.none )
 
 
 buildErrorMessage : Http.Error -> String
