@@ -5,9 +5,9 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
+import Post exposing (Post, PostId, postsDecoder)
 import RemoteData exposing (WebData)
 
-import Post exposing (Post, PostId, postsDecoder)
 
 type alias Model =
     { posts : WebData (List Post)
@@ -19,8 +19,8 @@ type Msg
     | PostsReceived (WebData (List Post))
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+init : ( Model, Cmd Msg )
+init =
     ( { posts = RemoteData.Loading }, fetchPosts )
 
 
